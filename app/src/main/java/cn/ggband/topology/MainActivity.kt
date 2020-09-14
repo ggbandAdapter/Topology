@@ -57,7 +57,44 @@ class MainActivity : AppCompatActivity() {
                     type = 0
                     name = "Mesh"
                     desc = "Mesh 2"
+                },
+                NodeBean().apply {
+                    type = 1
+                    name = "Router"
+                    desc = "Router 2"
+                    childs = arrayListOf(
+                        NodeBean().apply {
+                            type = 0
+                            name = "Mesh"
+                            desc = "Mesh 3"
+                        },
+                        NodeBean().apply {
+                            type = 1
+                            name = "Router"
+                            desc = "Router 3"
+                            childs = arrayListOf(
+                                NodeBean().apply {
+                                    type = 0
+                                    name = "Mesh"
+                                    desc = "Mesh 4"
+                                },
+                                NodeBean().apply {
+                                    type = 1
+                                    name = "Router"
+                                    desc = "Router 4"
+                                }
+
+                            )
+                        }
+
+                    )
+                },
+                NodeBean().apply {
+                    type = 0
+                    name = "Mesh"
+                    desc = "Mesh 2"
                 }
+
 
             )
         }

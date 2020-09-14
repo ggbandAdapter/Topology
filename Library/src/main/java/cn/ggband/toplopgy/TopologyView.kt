@@ -1,6 +1,10 @@
 package cn.ggband.toplopgy
 
 import android.content.Context
+import android.graphics.Canvas
+import android.graphics.Color
+import android.graphics.Paint
+import android.graphics.Path
 import android.util.AttributeSet
 import android.util.Log
 import android.view.LayoutInflater
@@ -15,13 +19,23 @@ class TopologyView @JvmOverloads constructor(
     context: Context, attrs: AttributeSet? = null, defStyleAttr: Int = 0
 ) : ViewGroup(context, attrs, defStyleAttr) {
 
-    private var mNodeViewCallback: NodeViewCallback? = null
-
     private val LOGTAG = "TopologyView"
 
-    init {
-        //  orientation = VERTICAL
+    //节点水平间距
+    private var nodeHSpace = 25
+    //节点垂直间距
+    private var nodeVSpace = 129
+
+    private var mPathPaint: Paint = Paint().apply {
+        color = Color.parseColor("#FF0000")
+        isAntiAlias = true
+        strokeWidth = 4f
+        style = Paint.Style.STROKE
     }
+
+
+    private var mNodeViewCallback: NodeViewCallback? = null
+
 
     private val topologyList = ArrayList<TopologyEx>()
 
@@ -41,8 +55,8 @@ class TopologyView @JvmOverloads constructor(
             nodeChildView = getChildAt(i)
             topologyEx = topologyList[i]
             sameFloorList = topologyList.filter { it.floor == topologyEx.floor }
-            val index = sameFloorList.indexOf(topologyEx)
-            Log.d(LOGTAG, "node on sameFloorList index:$index")
+            val sameFloorIndex = sameFloorList.indexOf(topologyEx)
+            Log.d(LOGTAG, "node on sameFloorList index:$sameFloorIndex")
             Log.d(LOGTAG, "lastFloor:$lastFloor;currFloor:${topologyEx.floor}")
 
             if (lastFloor != topologyEx.floor) {
@@ -51,7 +65,8 @@ class TopologyView @JvmOverloads constructor(
             Log.d(LOGTAG, "layoutWidth:$layoutWidth")
 
             childLeft = layoutWidth
-            childTop = topologyEx.floor * nodeChildView.measuredHeight
+            childTop =
+                topologyEx.floor * nodeChildView.measuredHeight + topologyEx.floor * nodeVSpace
             childRight = childLeft + nodeChildView.measuredWidth
             childBottom = childTop + nodeChildView.measuredHeight
             nodeChildView.layout(
@@ -60,10 +75,28 @@ class TopologyView @JvmOverloads constructor(
                 childRight,
                 childBottom
             )
-            layoutWidth += nodeChildView.measuredWidth
+            layoutWidth += nodeChildView.measuredWidth + nodeHSpace
             lastFloor = topologyEx.floor
         }
     }
+
+
+    override fun dispatchDraw(canvas: Canvas) {
+        super.dispatchDraw(canvas)
+        val path = Path()
+        for (i in 0 until childCount) {
+            val childView = getChildAt(i)
+            topologyList[i].topology.childList()?.forEach { iTopology ->
+                val cChildIndex = topologyList.indexOfFirst { it.topology == iTopology }
+                val cChildView = getChildAt(cChildIndex)
+                path.moveTo(childView.x+childView.width/2, childView.y+childView.height)
+                path.lineTo(cChildView.x+cChildView.width/2, cChildView.y)
+                canvas.drawPath(path, mPathPaint)
+            }
+        }
+
+    }
+
 
     /**
      * 更新
@@ -82,7 +115,7 @@ class TopologyView @JvmOverloads constructor(
             val nodeView = getNodeItemView(it.topology)
             mNodeViewCallback?.onNodeView(nodeView, it.topology)
             addView(nodeView)
-            Log.d(LOGTAG,it.topology.toString()+"===floor:"+it.floor)
+            Log.d(LOGTAG, it.topology.toString() + "===floor:" + it.floor)
         }
     }
 
@@ -109,6 +142,9 @@ class TopologyView @JvmOverloads constructor(
 
     override fun onMeasure(widthMeasureSpec: Int, heightMeasureSpec: Int) {
         super.onMeasure(widthMeasureSpec, heightMeasureSpec)
+        val widthMode = MeasureSpec.getMode(widthMeasureSpec)
+        val heightMode = MeasureSpec.getMode(heightMeasureSpec)
+
         val childCount = this.childCount
         for (i in 0 until childCount) {
             val child = getChildAt(i)
@@ -117,6 +153,22 @@ class TopologyView @JvmOverloads constructor(
         val width = MeasureSpec.getSize(widthMeasureSpec)
         val height = MeasureSpec.getSize(heightMeasureSpec)
         setMeasuredDimension(width, height)
-
     }
+
+    /**
+     * 最大水平宽度
+     */
+    private fun getMaxFloorWidth(): Int {
+        val maxTopologyChildSize = topologyList.maxBy {
+            it.topology.childList()?.size ?: 0
+        }?.topology?.childList()?.size ?: 0
+        var maxChildViewWidth = 0
+        for (i in 0 until childCount) {
+            if (getChildAt(i).measuredWidth > maxChildViewWidth)
+                maxChildViewWidth = getChildAt(i).measuredWidth
+        }
+        return maxTopologyChildSize * maxChildViewWidth + (maxTopologyChildSize - 1) * nodeVSpace
+    }
+
+
 }
