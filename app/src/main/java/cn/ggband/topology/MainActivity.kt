@@ -69,6 +69,36 @@ class MainActivity : AppCompatActivity() {
                             desc = "Mesh 3"
                         },
                         NodeBean().apply {
+                            type = 0
+                            name = "Mesh"
+                            desc = "Mesh 3"
+                        },
+                        NodeBean().apply {
+                            type = 0
+                            name = "Mesh"
+                            desc = "Mesh 3"
+                        },
+                        NodeBean().apply {
+                            type = 0
+                            name = "Mesh"
+                            desc = "Mesh 3"
+                        },
+                        NodeBean().apply {
+                            type = 0
+                            name = "Mesh"
+                            desc = "Mesh 3"
+                        },
+                        NodeBean().apply {
+                            type = 0
+                            name = "Mesh"
+                            desc = "Mesh 3"
+                        },
+                        NodeBean().apply {
+                            type = 0
+                            name = "Mesh"
+                            desc = "Mesh 3"
+                        },
+                        NodeBean().apply {
                             type = 1
                             name = "Router"
                             desc = "Router 3"

@@ -9,6 +9,7 @@
     <cn.ggband.toplopgy.TopologyView
         android:id="@+id/topologyView"
         android:layout_width="match_parent"
+        android:background="@color/colorPrimary"
         android:layout_height="match_parent"
         app:layout_constraintBottom_toBottomOf="parent"
         app:layout_constraintLeft_toLeftOf="parent"
