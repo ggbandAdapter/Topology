@@ -7,9 +7,12 @@ import android.graphics.Paint
 import android.graphics.Path
 import android.util.AttributeSet
 import android.util.Log
-import android.view.*
-import android.widget.Scroller
+import android.view.LayoutInflater
+import android.view.MotionEvent
+import android.view.View
+import android.view.ViewGroup
 import cn.ggband.toplopgy.callback.NodeViewCallback
+import kotlin.math.abs
 
 
 /**
@@ -26,6 +29,13 @@ class TopologyView @JvmOverloads constructor(
     //节点垂直间距
     private var nodeVSpace = 129
 
+    private val moveLimit = 8f
+
+    private var downX = 0f
+    private var downY = 0f
+    private var mLastX = 0f
+    private var mLastY = 0f
+
     private var mPathPaint: Paint = Paint().apply {
         color = Color.parseColor("#FF0000")
         isAntiAlias = true
@@ -35,14 +45,6 @@ class TopologyView @JvmOverloads constructor(
 
     private var lastInterceptX = 0f
     private var lastInterceptY = 0f
-    // //滑动速度追踪器
-    private lateinit var mVelocityTracker: VelocityTracker
-    //这个scroller是为了平滑滑动
-    private lateinit var mScroller: Scroller
-    private var downX = 0f
-    private var distanceX = 0f
-    private var isFirstTouch = true
-    private var childIndex = -1
 
 
     private var mNodeViewCallback: NodeViewCallback? = null
@@ -50,15 +52,8 @@ class TopologyView @JvmOverloads constructor(
 
     private val topologyList = ArrayList<TopologyEx>()
 
-    init {
-        mScroller =  Scroller(context);
-        //初始化追踪器
-        mVelocityTracker = VelocityTracker.obtain();//获得追踪器对象，这里用obtain，按照谷歌的尿性，应该是考虑了对象重用
-    }
-
 
     override fun onLayout(changed: Boolean, left: Int, top: Int, right: Int, bottom: Int) {
-        //  super.onLayout(changed, left, top, right, bottom)
         var nodeChildView: View
         var childLeft = 0
         var childTop = 0
@@ -111,7 +106,6 @@ class TopologyView @JvmOverloads constructor(
                 canvas.drawPath(path, mPathPaint)
             }
         }
-
     }
 
 
@@ -169,7 +163,7 @@ class TopologyView @JvmOverloads constructor(
         }
         val width = MeasureSpec.getSize(widthMeasureSpec)
         val height = MeasureSpec.getSize(heightMeasureSpec)
-        setMeasuredDimension(getMaxFloorWidth(), height)
+        setMeasuredDimension(width, height)
     }
 
     /**
@@ -189,7 +183,8 @@ class TopologyView @JvmOverloads constructor(
 
 
     override fun onInterceptTouchEvent(event: MotionEvent): Boolean {
-        var ifIntercept = false
+        var handled = false
+        if (scrollX == 0) return ifIntercept
         when (event.action) {
             MotionEvent.ACTION_DOWN -> {
                 lastInterceptX = event.rawX
@@ -199,11 +194,7 @@ class TopologyView @JvmOverloads constructor(
                 //检查是横向移动的距离大，还是纵向
                 val xDistance: Float = Math.abs(lastInterceptX - event.rawX)
                 val yDistance: Float = Math.abs(lastInterceptY - event.rawY)
-                ifIntercept = if (xDistance > yDistance) {
-                    true
-                } else {
-                    false
-                }
+                ifIntercept = xDistance > moveLimit || yDistance > moveLimit
             }
             MotionEvent.ACTION_UP -> {
             }
@@ -213,86 +204,49 @@ class TopologyView @JvmOverloads constructor(
         return ifIntercept
     }
 
+
     override fun onTouchEvent(event: MotionEvent): Boolean {
-        Log.d(LOGTAG, "rawX:${event.rawX};rawY:${event.rawY}")
-        val scrollX = scrollX //控件的左边界，与屏幕原点的X轴坐标
 
-        val scrollXMax = (childCount - 1) * getChildAt(1).measuredWidth
-        val childWidth = getChildAt(0).width
-        mVelocityTracker!!.addMovement(event) //在onTouchEvent这里，截取event对象
-
-        val configuration = ViewConfiguration.get(context)
         when (event.action) {
             MotionEvent.ACTION_DOWN -> {
+                downX = event.x
+                downY = event.y
+                mLastX = event.x
+                mLastY = event.y
+                Log.d(LOGTAG, "width:${width};height:${height}")
+
             }
             MotionEvent.ACTION_MOVE -> {
-                //先让你滑动起来
-                val moveX = event.rawX
-                if (isFirstTouch) { //一次事件序列，只会赋值一次？
-                    downX = moveX
-                    isFirstTouch = false
+                Log.d(LOGTAG, "scrollX:${scrollX};scrollX:${scrollY}")
+                val moveX = (event.x - mLastX).toInt()
+                val moveY = (event.y - mLastY).toInt()
+                Log.d(LOGTAG, "moveX:${moveX};moveY:${moveY}")
+
+                if (canMove(event)) {
+
+
+                    scrollBy(-moveX, -moveY) //滑动
                 }
-                Log.d(LOGTAG, "$downX|$moveX|$distanceX")
-                distanceX = downX - moveX
-                //判定是否可以滑动
-//这里有一个隐患，由于不知道Move事件，会以什么频率来分发，所以，这里多少都会出现一点误差
-                if (childCount >= 2) { //子控件在2个或者2个以上时，才有下面的效果
-//如果命令是向左滑动,distanceX>0 ，那么判断命令是否可以执行
-//如果命令是向右滑动,distanceX<0 ，那么判断命令是否可以执行
-                    Log.d(LOGTAG, "scrollX:$scrollX")
-                    if (distanceX <= 0) {
-                        if (scrollX >= 0) scrollBy(distanceX.toInt(), 0) //滑动
-                    } else {
-                        if (scrollX <= scrollXMax) scrollBy(distanceX.toInt(), 0) //滑动
-                    }
-                } //如果只有一个，则不允许滑动，防止bug
+                mLastX = event.x
+                mLastY = event.y
             }
             MotionEvent.ACTION_UP -> {
-                mVelocityTracker.computeCurrentVelocity(
-                    1000,
-                    configuration.scaledMaximumFlingVelocity.toFloat()
-                ) //计算，最近的event到up之间的速率
-                val xVelocity = mVelocityTracker.xVelocity //当前横向的移动速率
-                val edgeXVelocity =
-                    configuration.scaledMinimumFlingVelocity.toFloat() //临界点
-                childIndex =
-                    (scrollX + childWidth / 2) / childWidth //整除的方式，来确定X轴应该所在的单元，将每一个item的竖向中间线定为滑动的临界线
-                if (Math.abs(xVelocity) > edgeXVelocity) { //如果当前横向的速率大于零界点，
-                    childIndex =
-                        if (xVelocity > 0) childIndex - 1 else childIndex + 1 //xVelocity正数，表示从左往右滑，所以child应该是要显示前面一个
-                }
-                //                childIndex = Math.min(getChildCount() - 1, Math.max(childIndex, 0));//不可以超出左右边界,这种写法可能很难一眼看懂，那就替换成下面的写法
-                if (childIndex < 0) //计算出的childIndex可能是负数。那就赋值为0
-                    childIndex =
-                        0 else if (childIndex >= childCount) { //也有可能超出childIndex的最大值，那就赋值为最大值-1
-                    childIndex = childCount - 1
-                }
-                smoothScrollBy(childIndex * childWidth - scrollX, 0) // 回滚的距离
-                mVelocityTracker.clear()
-                isFirstTouch = true
+
+
             }
+
             MotionEvent.ACTION_CANCEL -> {
             }
         }
-        downX = event.rawX
-        return super.onTouchEvent(event)
+        return true
     }
 
-    /**
-     * 最叼的还是这个方法，平滑地回滚，从当前位置滚到目标位置
-     * @param dx
-     * @param dy
-     */
-   private fun smoothScrollBy(dx: Int, dy: Int) {
-        mScroller!!.startScroll(scrollX, scrollY, dx, dy, 500) //从当前滑动的位置，平滑地过度到目标位置
-        invalidate()
-    }
-
-    override fun computeScroll() {
-        if (mScroller!!.computeScrollOffset()) {
-            scrollTo(mScroller.currX, mScroller.currY)
-            invalidate()
-        }
+    private fun canMove(event: MotionEvent): Boolean {
+        val moveX = event.x
+        val moveY = event.y
+        val xDistance: Float = abs(moveX - downX)
+        val yDistance: Float = abs(moveY - downY)
+        return xDistance > moveLimit || yDistance > moveLimit
     }
 
 
